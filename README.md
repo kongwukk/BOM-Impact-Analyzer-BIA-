@@ -123,6 +123,7 @@ npm run dev
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | `/api/health` | 服务健康检查 |
+| GET | `/api/overview` | 数据库总览统计与最近产品 |
 | POST | `/api/bom/upload` | 上传单个 BOM |
 | POST | `/api/bom/batch-upload` | 上传多个 BOM |
 | GET | `/api/impact/search?q=...` | 按编号、型号、名称或描述搜索候选元器件 |

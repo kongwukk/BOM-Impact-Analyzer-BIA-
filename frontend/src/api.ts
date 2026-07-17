@@ -23,6 +23,18 @@ export interface ComponentCandidate {
   manufacturer: string | null;
 }
 
+export interface OverviewData {
+  product_count: number;
+  component_count: number;
+  bom_item_count: number;
+  recent_products: Array<{
+    product_code: string;
+    product_name: string;
+    component_count: number;
+    updated_at: string;
+  }>;
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -44,6 +56,10 @@ export function getImpactById(componentId: number): Promise<ImpactResult> {
 
 export function searchComponents(query: string): Promise<ComponentCandidate[]> {
   return request(`/api/impact/search?q=${encodeURIComponent(query)}`);
+}
+
+export function getOverview(): Promise<OverviewData> {
+  return request("/api/overview");
 }
 
 export function uploadBom(file: File, productCode?: string): Promise<{
