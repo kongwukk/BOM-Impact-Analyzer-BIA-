@@ -82,7 +82,7 @@ npm run dev
 
 | 标准字段 | 可识别列名示例 |
 | --- | --- |
-| `part_number` | 型号、器件型号、Part Number、MPN、元件编号 |
+| `part_number` | 型号、器件型号、编号、物料编号、物料编码、料号、Part Number、MPN、元件编号 |
 | `quantity` | 数量、Qty、Quantity、用量 |
 | `reference` | 位号、Reference、Ref、Designator |
 | `manufacturer` | 制造商、Manufacturer、厂商、品牌 |
@@ -90,6 +90,8 @@ npm run dev
 | `is_critical` | 关键器件、是否关键、is_critical |
 
 产品型号可在上传时填写；留空则使用文件名。建议先用标准列名建立统一 BOM 模板。
+
+导入时会扫描 Excel 中的全部工作表，并自动寻找前 40 行内的 BOM 表头。列名允许常见前后缀和轻微文字差异；没有 BOM 表头的说明页会跳过并在导入结果中提示。同一编号出现在多个工作表时按同一物料合并，并累加数量、合并位号。
 
 ## API 概览
 

@@ -14,11 +14,16 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      BIA_DATABASE_URL: postgresql+psycopg://bom_user:bom_password@postgres:5432/bom_db
-      BIA_CORS_ORIGINS: http://localhost:3000
-      BIA_UPLOAD_DIR: /app/data/uploads
+      - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+      - PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+      # 修改为 psycopg2
+      - BIA_DATABASE_URL=postgresql+psycopg2://bom_user:bom_password@postgres:5432/bom_db
+      - BIA_CORS_ORIGINS=http://localhost:3000
+      - BIA_UPLOAD_DIR=/app/data/uploads
     volumes:
       - upload_data:/app/data/uploads
     ports:
@@ -37,4 +42,3 @@ services:
 volumes:
   postgres_data:
   upload_data:
-
