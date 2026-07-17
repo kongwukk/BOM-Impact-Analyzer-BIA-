@@ -15,6 +15,12 @@ export interface ImpactResult {
   risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 }
 
+export interface ComponentCandidate {
+  part_number: string;
+  description: string | null;
+  manufacturer: string | null;
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -30,6 +36,10 @@ export function getImpact(partNumber: string): Promise<ImpactResult> {
   return request(`/api/impact/${encodeURIComponent(partNumber)}`);
 }
 
+export function searchComponents(query: string): Promise<ComponentCandidate[]> {
+  return request(`/api/impact/search?q=${encodeURIComponent(query)}`);
+}
+
 export function uploadBom(file: File, productCode?: string): Promise<{
   product_id: number;
   components_imported: number;
@@ -40,4 +50,3 @@ export function uploadBom(file: File, productCode?: string): Promise<{
   if (productCode) body.append("product_code", productCode);
   return request("/api/bom/upload", { method: "POST", body });
 }
-

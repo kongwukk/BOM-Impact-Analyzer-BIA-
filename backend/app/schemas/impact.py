@@ -23,6 +23,14 @@ class ImpactResponse(BaseModel):
     risk_level: RiskLevel
 
 
+class ComponentCandidate(BaseModel):
+    part_number: str
+    description: str | None
+    manufacturer: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RiskAssessment(BaseModel):
     level: RiskLevel
     reason: str
@@ -31,4 +39,3 @@ class RiskAssessment(BaseModel):
 class ImpactAnalysisResponse(ImpactResponse):
     risk_assessment: RiskAssessment
     recommendations: list[str]
-

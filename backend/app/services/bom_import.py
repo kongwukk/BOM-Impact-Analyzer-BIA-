@@ -113,9 +113,15 @@ def _standardize_sheet(raw: pd.DataFrame) -> pd.DataFrame | None:
         if field is None:
             continue
         values = data.iloc[:, position]
-        # Some files contain both “名称” and “物料描述”; coalesce both columns.
+        # Keep both “名称” and “物料描述” so either can be searched later.
         if field in result:
-            result[field] = values.combine_first(result[field])
+            if field == "description":
+                result[field] = [
+                    _merge_text(_optional_text(current), _optional_text(incoming))
+                    for current, incoming in zip(result[field], values, strict=True)
+                ]
+            else:
+                result[field] = result[field].combine_first(values)
         else:
             result[field] = values
     return result.dropna(how="all")
@@ -209,6 +215,9 @@ async def import_bom(
                 item.reference, _optional_text(row.get("reference"))
             )
             item.is_critical = item.is_critical or _as_bool(row.get("is_critical"))
+            item.component.description = _merge_text(
+                item.component.description, _optional_text(row.get("description"))
+            )
             skipped += 1
             continue
 
@@ -224,8 +233,9 @@ async def import_bom(
         else:
             if component.manufacturer is None:
                 component.manufacturer = _optional_text(row.get("manufacturer"))
-            if component.description is None:
-                component.description = _optional_text(row.get("description"))
+            component.description = _merge_text(
+                component.description, _optional_text(row.get("description"))
+            )
 
         item = BomItem(
             product=product,
@@ -259,8 +269,17 @@ def _optional_text(value: Any) -> str | None:
 
 
 def _merge_text(current: str | None, incoming: str | None) -> str | None:
-    values = [value for value in (current, incoming) if value]
-    return ", ".join(dict.fromkeys(values)) or None
+    if not current:
+        return incoming
+    if not incoming:
+        return current
+    current_folded = current.casefold()
+    incoming_folded = incoming.casefold()
+    if incoming_folded in current_folded:
+        return current
+    if current_folded in incoming_folded:
+        return incoming
+    return f"{current}, {incoming}"
 
 
 def _as_bool(value: Any) -> bool:

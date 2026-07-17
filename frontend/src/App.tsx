@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { AlertTriangle, Boxes, Database, FileSpreadsheet, Search, Upload } from "lucide-react";
-import { getImpact, ImpactResult, uploadBom } from "./api";
+import { ComponentCandidate, getImpact, ImpactResult, searchComponents, uploadBom } from "./api";
 
 type View = "dashboard" | "upload" | "impact";
 
@@ -8,6 +8,7 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [partNumber, setPartNumber] = useState("");
   const [impact, setImpact] = useState<ImpactResult | null>(null);
+  const [candidates, setCandidates] = useState<ComponentCandidate[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
@@ -16,10 +17,32 @@ export default function App() {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setImpact(null);
+    setCandidates([]);
     try {
-      setImpact(await getImpact(partNumber.trim()));
+      const matches = await searchComponents(partNumber.trim());
+      if (matches.length === 0) {
+        setError("未找到匹配的编号、型号、名称或物料描述");
+      } else if (matches.length === 1) {
+        setImpact(await getImpact(matches[0].part_number));
+      } else {
+        setCandidates(matches);
+      }
     } catch (reason) {
       setImpact(null);
+      setError(reason instanceof Error ? reason.message : "查询失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function selectCandidate(candidate: ComponentCandidate) {
+    setBusy(true);
+    setError("");
+    try {
+      setImpact(await getImpact(candidate.part_number));
+      setCandidates([]);
+    } catch (reason) {
       setError(reason instanceof Error ? reason.message : "查询失败");
     } finally {
       setBusy(false);
@@ -74,14 +97,18 @@ export default function App() {
         {view === "impact" && (
           <section className="panel">
             <form className="search-form" onSubmit={searchImpact}>
-              <Search /><input required value={partNumber} onChange={(event) => setPartNumber(event.target.value)} placeholder="输入完整元器件型号，如 STM32F103C8T6" /><button className="primary" disabled={busy}>{busy ? "查询中…" : "查询影响"}</button>
+              <Search /><input required value={partNumber} onChange={(event) => setPartNumber(event.target.value)} placeholder="输入编号、型号、名称或物料描述" /><button className="primary" disabled={busy}>{busy ? "查询中…" : "查询影响"}</button>
             </form>
-            {impact ? <ImpactTable impact={impact} /> : <div className="empty"><Search size={42} /><h3>从一个元器件开始</h3><p>精确查询它出现在哪些产品 BOM 中。</p></div>}
+            {impact ? <ImpactTable impact={impact} /> : candidates.length ? <CandidateList candidates={candidates} select={selectCandidate} busy={busy} /> : <div className="empty"><Search size={42} /><h3>从一个元器件开始</h3><p>支持按编号、型号、名称或物料描述搜索。</p></div>}
           </section>
         )}
       </main>
     </div>
   );
+}
+
+function CandidateList({ candidates, select, busy }: { candidates: ComponentCandidate[]; select: (candidate: ComponentCandidate) => void; busy: boolean }) {
+  return <div className="candidates"><h3>找到多个相似元器件，请选择</h3>{candidates.map((candidate) => <button key={candidate.part_number} disabled={busy} onClick={() => select(candidate)}><span><strong>{candidate.part_number}</strong><small>{candidate.description || "暂无物料描述"}</small></span><em>{candidate.manufacturer || "厂家未知"}</em></button>)}</div>;
 }
 
 function Dashboard({ navigate }: { navigate: (view: View) => void }) {
@@ -91,4 +118,3 @@ function Dashboard({ navigate }: { navigate: (view: View) => void }) {
 function ImpactTable({ impact }: { impact: ImpactResult }) {
   return <div className="results"><div className="summary"><div><small>元器件型号</small><strong>{impact.part_number}</strong><span>{impact.manufacturer || "制造商未知"} · {impact.lifecycle_status}</span></div><div className={`risk ${impact.risk_level.toLowerCase()}`}>{impact.risk_level}</div><div className="count"><strong>{impact.total_affected}</strong><span>受影响产品</span></div></div><div className="table-wrap"><table><thead><tr><th>产品型号</th><th>产品名称</th><th>数量</th><th>位号</th><th>关键器件</th></tr></thead><tbody>{impact.affected_products.map((product) => <tr key={product.product_code}><td><b>{product.product_code}</b></td><td>{product.product_name}</td><td>{product.quantity}</td><td>{product.reference || "—"}</td><td>{product.is_critical ? "是" : "否"}</td></tr>)}</tbody></table></div></div>;
 }
-

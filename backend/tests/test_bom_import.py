@@ -12,7 +12,7 @@ def _workbook_bytes() -> bytes:
             [
                 ["智能安桌整灯BOM", None, None, None, None],
                 ["序号", "编号", "名称", "物料描述", "数量"],
-                [1, "X015010026", "控制板", None, 1],
+                [1, "X015010026", "WF模块", "IXC32-18-XHHIX-313-E08", 1],
             ]
         ).to_excel(writer, sheet_name="智能安桌整灯BOM", header=False, index=False)
         pd.DataFrame(
@@ -32,7 +32,10 @@ def test_reads_all_bom_sheets_and_finds_non_first_header_row() -> None:
 
     assert frame["part_number"].tolist() == ["X015010026", "X005030099"]
     assert frame["quantity"].tolist() == [1, 2]
-    assert frame["description"].tolist() == ["控制板", "电源板 AC 220V"]
+    assert frame["description"].tolist() == [
+        "WF模块, IXC32-18-XHHIX-313-E08",
+        "电源板 AC 220V",
+    ]
     assert frame["_sheet_name"].tolist() == ["智能安桌整灯BOM", "电源BOM"]
     assert skipped == ["说明"]
 

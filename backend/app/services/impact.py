@@ -1,9 +1,77 @@
+import re
+from difflib import SequenceMatcher
+
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import BomItem, Component, LifecycleStatus, Product, RiskLevel
-from app.schemas.impact import AffectedProduct, ImpactAnalysisResponse, ImpactResponse, RiskAssessment
+from app.schemas.impact import (
+    AffectedProduct,
+    ComponentCandidate,
+    ImpactAnalysisResponse,
+    ImpactResponse,
+    RiskAssessment,
+)
+
+
+def _normalized_search_text(value: str | None) -> str:
+    return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", (value or "").casefold())
+
+
+def _search_terms(query: str) -> list[str]:
+    terms = re.findall(r"[0-9A-Za-z\u4e00-\u9fff][0-9A-Za-z\u4e00-\u9fff._/-]*", query)
+    return list(dict.fromkeys(term for term in terms if len(_normalized_search_text(term)) >= 2))
+
+
+def _candidate_score(component: Component, query: str, terms: list[str]) -> float:
+    query_text = _normalized_search_text(query)
+    number = _normalized_search_text(component.part_number)
+    description = _normalized_search_text(component.description)
+    manufacturer = _normalized_search_text(component.manufacturer)
+    searchable = (number, description, manufacturer)
+
+    if query_text == number:
+        return 1000
+    score = 0.0
+    if query_text and query_text in number:
+        score = 850
+    elif query_text and query_text in description:
+        score = 750
+
+    normalized_terms = [_normalized_search_text(term) for term in terms]
+    matched = sum(any(term in field for field in searchable) for term in normalized_terms)
+    if normalized_terms:
+        score = max(score, 500 * matched / len(normalized_terms))
+    score += 100 * SequenceMatcher(None, query_text, number).ratio()
+    return score
+
+
+def search_components(query: str, db: Session, limit: int = 20) -> list[ComponentCandidate]:
+    cleaned = query.strip()
+    if not cleaned:
+        return []
+
+    terms = _search_terms(cleaned)
+    patterns = [cleaned, *terms]
+    conditions = []
+    for pattern in dict.fromkeys(patterns):
+        escaped = pattern.replace("%", r"\%").replace("_", r"\_")
+        like = f"%{escaped}%"
+        conditions.extend(
+            [
+                Component.part_number.ilike(like, escape="\\"),
+                Component.description.ilike(like, escape="\\"),
+                Component.manufacturer.ilike(like, escape="\\"),
+            ]
+        )
+    components = db.scalars(select(Component).where(or_(*conditions)).limit(100)).all()
+    ranked = sorted(
+        components,
+        key=lambda component: _candidate_score(component, cleaned, terms),
+        reverse=True,
+    )
+    return [ComponentCandidate.model_validate(component) for component in ranked[:limit]]
 
 
 def _load_impact(part_number: str, db: Session) -> tuple[Component, list[AffectedProduct]]:
@@ -68,4 +136,3 @@ def analyze_impact(part_number: str, db: Session) -> ImpactAnalysisResponse:
         risk_assessment=RiskAssessment(level=impact.risk_level, reason=reason),
         recommendations=recommendations,
     )
-

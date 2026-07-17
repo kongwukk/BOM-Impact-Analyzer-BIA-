@@ -8,7 +8,7 @@
 - Product、Component、BomItem、ImpactAnalysis 核心数据模型
 - `.xlsx` / `.xlsm` BOM 导入和常见中英文列名映射
 - 同一产品再次导入时更新 BOM，元器件按型号复用
-- 按 `part_number` 查询所有受影响产品
+- 按编号、型号、名称或物料描述搜索元器件，并查询所有受影响产品
 - Active / NRND / EOL 生命周期风险分级骨架
 - 基于安全结构化条件的自然语言查询基础实现
 - React + TypeScript 响应式管理工作台
@@ -100,7 +100,8 @@ npm run dev
 | GET | `/api/health` | 服务健康检查 |
 | POST | `/api/bom/upload` | 上传单个 BOM |
 | POST | `/api/bom/batch-upload` | 上传多个 BOM |
-| GET | `/api/impact/{part_number}` | 精确影响查询 |
+| GET | `/api/impact/search?q=...` | 按编号、型号、名称或描述搜索候选元器件 |
+| GET | `/api/impact/{part_number}` | 按准确编号查询影响范围 |
 | GET | `/api/impact/analyze/{part_number}` | 风险分析 |
 | POST | `/api/query/natural` | 自然语言结构化查询 |
 
