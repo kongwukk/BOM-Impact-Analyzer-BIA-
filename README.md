@@ -45,6 +45,22 @@
 docker compose up --build
 ```
 
+中国区使用推荐在docker->settings->Docker Engine修改为：
+{
+  "builder": {
+    "gc": {
+      "defaultKeepStorage": "20GB",
+      "enabled": true
+    }
+  },
+  "experimental": false,
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://dockerproxy.com"
+  ]
+}
+
 启动后访问：
 
 - Web 工作台：<http://localhost:3000>
