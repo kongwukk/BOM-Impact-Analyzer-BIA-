@@ -1,3 +1,5 @@
+name: bia
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -40,5 +42,9 @@ services:
       - backend
 
 volumes:
+  # Explicit names keep the same data even if the repository directory or
+  # Compose invocation path changes. `docker compose up --build` reuses them.
   postgres_data:
+    name: bia_postgres_data
   upload_data:
+    name: bia_upload_data

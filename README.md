@@ -42,7 +42,15 @@
 需要 Docker Desktop 或 Docker Engine：
 
 ```bash
-docker compose up --build
+docker compose up -d --build
+```
+
+PostgreSQL 数据和上传的原始 BOM 分别保存在固定命名卷 `bia_postgres_data`、`bia_upload_data` 中。重新构建镜像或执行普通的 `docker compose down` 不会删除数据。不要执行 `docker compose down -v` 或手动删除这两个卷，否则数据库和上传文件会被永久清除。
+
+可以用下面的命令确认数据库卷仍然存在：
+
+```bash
+docker volume inspect bia_postgres_data
 ```
 
 中国区使用推荐在docker->settings->Docker Engine修改为：
