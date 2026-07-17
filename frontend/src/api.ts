@@ -16,7 +16,9 @@ export interface ImpactResult {
 }
 
 export interface ComponentCandidate {
+  id: number;
   part_number: string;
+  material_code: string | null;
   description: string | null;
   manufacturer: string | null;
 }
@@ -34,6 +36,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export function getImpact(partNumber: string): Promise<ImpactResult> {
   return request(`/api/impact/${encodeURIComponent(partNumber)}`);
+}
+
+export function getImpactById(componentId: number): Promise<ImpactResult> {
+  return request(`/api/impact/component/${componentId}`);
 }
 
 export function searchComponents(query: string): Promise<ComponentCandidate[]> {

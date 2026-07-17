@@ -25,6 +25,11 @@ COLUMN_MAPPING = {
         "pn",
         "mpn",
         "mfr part #",
+        "物料描述",
+        "元件描述",
+        "规格描述",
+    ],
+    "material_code": [
         "元件编号",
         "物料编号",
         "物料编码",
@@ -35,14 +40,19 @@ COLUMN_MAPPING = {
     ],
     "quantity": ["quantity", "数量", "qty", "用量", "单机用量", "默认数量"],
     "reference": ["reference", "位号", "ref", "designator", "元件位号"],
-    "manufacturer": ["manufacturer", "制造商", "厂家", "厂商", "品牌"],
+    "manufacturer": [
+        "manufacturer",
+        "制造商",
+        "厂家",
+        "厂商",
+        "品牌",
+        "推荐供应商",
+        "指定供应商",
+    ],
     "description": [
         "description",
         "描述",
         "器件描述",
-        "物料描述",
-        "元件描述",
-        "规格描述",
         "名称",
         "物料名称",
         "元件名称",
@@ -113,15 +123,9 @@ def _standardize_sheet(raw: pd.DataFrame) -> pd.DataFrame | None:
         if field is None:
             continue
         values = data.iloc[:, position]
-        # Keep both “名称” and “物料描述” so either can be searched later.
+        # Coalesce duplicate aliases of the same field.
         if field in result:
-            if field == "description":
-                result[field] = [
-                    _merge_text(_optional_text(current), _optional_text(incoming))
-                    for current, incoming in zip(result[field], values, strict=True)
-                ]
-            else:
-                result[field] = result[field].combine_first(values)
+            result[field] = result[field].combine_first(values)
         else:
             result[field] = values
     return result.dropna(how="all")
@@ -200,6 +204,7 @@ async def import_bom(
     imported = 0
     skipped = 0
     imported_items: dict[str, BomItem] = {}
+    items_by_component_id: dict[int, BomItem] = {}
     for _, row in frame.iterrows():
         raw_number = row.get("part_number")
         if pd.isna(raw_number) or not str(raw_number).strip():
@@ -208,8 +213,11 @@ async def import_bom(
         if _match_column(raw_number) == "part_number":
             continue
         part_number = str(raw_number).strip().upper()
-        if part_number in imported_items:
-            item = imported_items[part_number]
+        material_code = _optional_text(row.get("material_code"))
+        material_code = material_code.upper() if material_code else None
+        identity = material_code or part_number
+        if identity in imported_items:
+            item = imported_items[identity]
             item.quantity += _positive_int(row.get("quantity"))
             item.reference = _merge_text(
                 item.reference, _optional_text(row.get("reference"))
@@ -218,24 +226,65 @@ async def import_bom(
             item.component.description = _merge_text(
                 item.component.description, _optional_text(row.get("description"))
             )
+            if item.component.part_number != part_number:
+                item.component.description = _merge_text(
+                    item.component.description, part_number
+                )
             skipped += 1
             continue
 
         component = db.scalar(select(Component).where(Component.part_number == part_number))
+        legacy_component = False
+        if component is None and material_code:
+            component = db.scalar(
+                select(Component).where(
+                    Component.attributes["material_code"].as_string() == material_code
+                )
+            )
+        if component is None and material_code:
+            # Migrate records imported by the old rule, where 编号 was part_number.
+            component = db.scalar(
+                select(Component).where(Component.part_number == material_code)
+            )
+            legacy_component = component is not None
         if component is None:
             component = Component(
                 part_number=part_number,
                 manufacturer=_optional_text(row.get("manufacturer")),
                 description=_optional_text(row.get("description")),
+                attributes={"material_code": material_code} if material_code else {},
             )
             db.add(component)
             db.flush()
         else:
+            if legacy_component:
+                component.part_number = part_number
+                component.description = _optional_text(row.get("description"))
             if component.manufacturer is None:
                 component.manufacturer = _optional_text(row.get("manufacturer"))
-            component.description = _merge_text(
-                component.description, _optional_text(row.get("description"))
+            if not legacy_component:
+                component.description = _merge_text(
+                    component.description, _optional_text(row.get("description"))
+                )
+                if component.part_number != part_number:
+                    component.description = _merge_text(
+                        component.description, part_number
+                    )
+            if material_code:
+                attributes = dict(component.attributes or {})
+                attributes["material_code"] = material_code
+                component.attributes = attributes
+
+        if component.id in items_by_component_id:
+            item = items_by_component_id[component.id]
+            item.quantity += _positive_int(row.get("quantity"))
+            item.reference = _merge_text(
+                item.reference, _optional_text(row.get("reference"))
             )
+            item.is_critical = item.is_critical or _as_bool(row.get("is_critical"))
+            imported_items[identity] = item
+            skipped += 1
+            continue
 
         item = BomItem(
             product=product,
@@ -245,7 +294,8 @@ async def import_bom(
             is_critical=_as_bool(row.get("is_critical")),
         )
         db.add(item)
-        imported_items[part_number] = item
+        imported_items[identity] = item
+        items_by_component_id[component.id] = item
         imported += 1
 
     db.commit()

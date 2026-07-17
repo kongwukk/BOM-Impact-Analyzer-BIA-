@@ -30,17 +30,18 @@ def _workbook_bytes() -> bytes:
 def test_reads_all_bom_sheets_and_finds_non_first_header_row() -> None:
     frame, skipped = _read_bom_sheets(_workbook_bytes())
 
-    assert frame["part_number"].tolist() == ["X015010026", "X005030099"]
-    assert frame["quantity"].tolist() == [1, 2]
-    assert frame["description"].tolist() == [
-        "WF模块, IXC32-18-XHHIX-313-E08",
+    assert frame["part_number"].tolist() == [
+        "IXC32-18-XHHIX-313-E08",
         "电源板 AC 220V",
     ]
+    assert frame["material_code"].tolist() == ["X015010026", "X005030099"]
+    assert frame["quantity"].tolist() == [1, 2]
+    assert frame["description"].iloc[0] == "WF模块"
     assert frame["_sheet_name"].tolist() == ["智能安桌整灯BOM", "电源BOM"]
     assert skipped == ["说明"]
 
 
-def test_fuzzy_headers_do_not_confuse_sequence_number_with_part_number() -> None:
-    assert _match_column("编号") == "part_number"
-    assert _match_column("物料描叙（规格）") == "description"
+def test_material_code_and_model_description_are_separate_fields() -> None:
+    assert _match_column("编号") == "material_code"
+    assert _match_column("物料描叙（规格）") == "part_number"
     assert _match_column("序号") is None

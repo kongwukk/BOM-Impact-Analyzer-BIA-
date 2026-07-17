@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { AlertTriangle, Boxes, Database, FileSpreadsheet, Search, Upload } from "lucide-react";
-import { ComponentCandidate, getImpact, ImpactResult, searchComponents, uploadBom } from "./api";
+import { ComponentCandidate, getImpactById, ImpactResult, searchComponents, uploadBom } from "./api";
 
 type View = "dashboard" | "upload" | "impact";
 
@@ -24,7 +24,7 @@ export default function App() {
       if (matches.length === 0) {
         setError("未找到匹配的编号、型号、名称或物料描述");
       } else if (matches.length === 1) {
-        setImpact(await getImpact(matches[0].part_number));
+        setImpact(await getImpactById(matches[0].id));
       } else {
         setCandidates(matches);
       }
@@ -40,7 +40,7 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
-      setImpact(await getImpact(candidate.part_number));
+      setImpact(await getImpactById(candidate.id));
       setCandidates([]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "查询失败");
@@ -108,7 +108,7 @@ export default function App() {
 }
 
 function CandidateList({ candidates, select, busy }: { candidates: ComponentCandidate[]; select: (candidate: ComponentCandidate) => void; busy: boolean }) {
-  return <div className="candidates"><h3>找到多个相似元器件，请选择</h3>{candidates.map((candidate) => <button key={candidate.part_number} disabled={busy} onClick={() => select(candidate)}><span><strong>{candidate.part_number}</strong><small>{candidate.description || "暂无物料描述"}</small></span><em>{candidate.manufacturer || "厂家未知"}</em></button>)}</div>;
+  return <div className="candidates"><h3>找到多个相似元器件，请选择</h3>{candidates.map((candidate) => <button key={candidate.id} disabled={busy} onClick={() => select(candidate)}><span><strong>{candidate.part_number}</strong><small>{candidate.description || "暂无物料名称"}</small></span><em>{candidate.material_code ? `物料编号：${candidate.material_code}` : candidate.manufacturer || "厂家未知"}</em></button>)}</div>;
 }
 
 function Dashboard({ navigate }: { navigate: (view: View) => void }) {

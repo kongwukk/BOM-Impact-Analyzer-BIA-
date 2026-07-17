@@ -82,7 +82,8 @@ npm run dev
 
 | 标准字段 | 可识别列名示例 |
 | --- | --- |
-| `part_number` | 型号、器件型号、编号、物料编号、物料编码、料号、Part Number、MPN、元件编号 |
+| `part_number` | 物料描述、型号、器件型号、规格型号、Part Number、MPN |
+| `material_code` | 编号、物料编号、物料编码、料号、元件编号 |
 | `quantity` | 数量、Qty、Quantity、用量 |
 | `reference` | 位号、Reference、Ref、Designator |
 | `manufacturer` | 制造商、Manufacturer、厂商、品牌 |
@@ -101,7 +102,8 @@ npm run dev
 | POST | `/api/bom/upload` | 上传单个 BOM |
 | POST | `/api/bom/batch-upload` | 上传多个 BOM |
 | GET | `/api/impact/search?q=...` | 按编号、型号、名称或描述搜索候选元器件 |
-| GET | `/api/impact/{part_number}` | 按准确编号查询影响范围 |
+| GET | `/api/impact/component/{id}` | 按候选元器件 ID 查询影响范围 |
+| GET | `/api/impact/{part_number}` | 按准确元器件型号查询影响范围 |
 | GET | `/api/impact/analyze/{part_number}` | 风险分析 |
 | POST | `/api/query/natural` | 自然语言结构化查询 |
 

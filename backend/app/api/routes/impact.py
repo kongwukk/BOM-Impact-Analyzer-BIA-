@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.impact import ComponentCandidate, ImpactAnalysisResponse, ImpactResponse
-from app.services.impact import analyze_impact, get_impact, search_components
+from app.services.impact import analyze_impact, get_impact, get_impact_by_id, search_components
 
 router = APIRouter()
 
@@ -11,6 +11,11 @@ router = APIRouter()
 @router.get("/search", response_model=list[ComponentCandidate])
 def search(q: str, db: Session = Depends(get_db)) -> list[ComponentCandidate]:
     return search_components(q, db)
+
+
+@router.get("/component/{component_id}", response_model=ImpactResponse)
+def impact_by_id(component_id: int, db: Session = Depends(get_db)) -> ImpactResponse:
+    return get_impact_by_id(component_id, db)
 
 
 @router.get("/analyze/{part_number}", response_model=ImpactAnalysisResponse)

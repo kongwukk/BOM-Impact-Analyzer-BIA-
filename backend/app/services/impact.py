@@ -29,7 +29,8 @@ def _candidate_score(component: Component, query: str, terms: list[str]) -> floa
     number = _normalized_search_text(component.part_number)
     description = _normalized_search_text(component.description)
     manufacturer = _normalized_search_text(component.manufacturer)
-    searchable = (number, description, manufacturer)
+    material_code = _normalized_search_text((component.attributes or {}).get("material_code"))
+    searchable = (number, material_code, description, manufacturer)
 
     if query_text == number:
         return 1000
@@ -63,6 +64,9 @@ def search_components(query: str, db: Session, limit: int = 20) -> list[Componen
                 Component.part_number.ilike(like, escape="\\"),
                 Component.description.ilike(like, escape="\\"),
                 Component.manufacturer.ilike(like, escape="\\"),
+                Component.attributes["material_code"].as_string().ilike(
+                    like, escape="\\"
+                ),
             ]
         )
     components = db.scalars(select(Component).where(or_(*conditions)).limit(100)).all()
@@ -71,13 +75,21 @@ def search_components(query: str, db: Session, limit: int = 20) -> list[Componen
         key=lambda component: _candidate_score(component, cleaned, terms),
         reverse=True,
     )
-    return [ComponentCandidate.model_validate(component) for component in ranked[:limit]]
+    return [
+        ComponentCandidate(
+            id=component.id,
+            part_number=component.part_number,
+            material_code=(component.attributes or {}).get("material_code"),
+            description=component.description,
+            manufacturer=component.manufacturer,
+        )
+        for component in ranked[:limit]
+    ]
 
 
-def _load_impact(part_number: str, db: Session) -> tuple[Component, list[AffectedProduct]]:
-    component = db.scalar(
-        select(Component).where(Component.part_number == part_number.strip().upper())
-    )
+def _load_component_impact(
+    component: Component | None, db: Session
+) -> tuple[Component, list[AffectedProduct]]:
     if component is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "未找到该元器件")
     rows = db.execute(
@@ -99,6 +111,13 @@ def _load_impact(part_number: str, db: Session) -> tuple[Component, list[Affecte
     return component, products
 
 
+def _load_impact(part_number: str, db: Session) -> tuple[Component, list[AffectedProduct]]:
+    component = db.scalar(
+        select(Component).where(Component.part_number == part_number.strip().upper())
+    )
+    return _load_component_impact(component, db)
+
+
 def _risk(component: Component, products: list[AffectedProduct]) -> RiskLevel:
     if not products:
         return RiskLevel.LOW
@@ -112,6 +131,18 @@ def _risk(component: Component, products: list[AffectedProduct]) -> RiskLevel:
 
 def get_impact(part_number: str, db: Session) -> ImpactResponse:
     component, products = _load_impact(part_number, db)
+    return ImpactResponse(
+        part_number=component.part_number,
+        manufacturer=component.manufacturer,
+        lifecycle_status=component.lifecycle_status,
+        affected_products=products,
+        total_affected=len(products),
+        risk_level=_risk(component, products),
+    )
+
+
+def get_impact_by_id(component_id: int, db: Session) -> ImpactResponse:
+    component, products = _load_component_impact(db.get(Component, component_id), db)
     return ImpactResponse(
         part_number=component.part_number,
         manufacturer=component.manufacturer,

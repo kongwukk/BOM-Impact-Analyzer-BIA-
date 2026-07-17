@@ -24,7 +24,9 @@ class ImpactResponse(BaseModel):
 
 
 class ComponentCandidate(BaseModel):
+    id: int
     part_number: str
+    material_code: str | None
     description: str | None
     manufacturer: str | None
 
