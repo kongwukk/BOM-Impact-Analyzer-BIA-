@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bom_db
+      POSTGRES_USER: bom_user
+      POSTGRES_PASSWORD: bom_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bom_user -d bom_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      BIA_DATABASE_URL: postgresql+psycopg://bom_user:bom_password@postgres:5432/bom_db
+      BIA_CORS_ORIGINS: http://localhost:3000
+      BIA_UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - upload_data:/app/data/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  upload_data:
+

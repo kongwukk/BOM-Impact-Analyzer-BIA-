@@ -21,3 +21,20 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.db
+
+# Node / Vite
+node_modules/
+dist/
+
+# Runtime data and local configuration
+backend/data/
+.env
+*.log
