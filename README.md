@@ -10,7 +10,9 @@
 - 同一产品再次导入时更新 BOM，元器件按型号复用
 - 按编号、型号、名称或物料描述搜索元器件，并查询所有受影响产品
 - Active / NRND / EOL 生命周期风险分级骨架
-- 基于安全结构化条件的自然语言查询基础实现
+- 可配置的 OpenAI 兼容大模型意图解析（OpenAI / DeepSeek / Qwen / 本地网关）
+- 大模型只生成白名单查询计划，由 ORM 参数化执行，禁止任意 SQL
+- 大模型未配置或调用失败时自动降级到本地规则查询
 - React + TypeScript 响应式管理工作台
 - PostgreSQL + 前后端 Docker Compose 部署
 - 本地开发默认使用 SQLite，降低启动门槛
@@ -90,6 +92,22 @@ uvicorn app.main:app --reload
 
 默认数据库为 `backend/data/bom.db`。如需 PostgreSQL，可复制 `.env.example` 到 `backend/.env` 并修改 `BIA_DATABASE_URL`。
 
+### 配置大模型
+
+后端支持所有提供 `/chat/completions` 的 OpenAI 兼容服务。将以下变量写入
+`backend/.env`（本地启动）或仓库根目录 `.env`（Docker Compose）：
+
+```env
+BIA_LLM_ENABLED=true
+BIA_LLM_API_KEY=your-api-key
+BIA_LLM_BASE_URL=https://api.openai.com/v1
+BIA_LLM_MODEL=gpt-4o-mini
+```
+
+DeepSeek、通义千问兼容接口或企业内部网关只需替换 `BASE_URL` 和 `MODEL`。
+密钥仅保存在后端，绝不会发送到浏览器。未配置密钥时，智能问答仍可使用本地规则完成
+型号、制造商、描述关键词和生命周期状态查询。
+
 前端需要 Node.js 20+：
 
 ```bash
@@ -131,7 +149,8 @@ npm run dev
 | GET | `/api/impact/{part_number}` | 按准确元器件型号查询影响范围 |
 | GET | `/api/impact/analyze/{part_number}` | 风险分析 |
 | POST | `/api/query/natural` | 自然语言结构化查询 |
+| GET | `/api/query/status` | 大模型连接配置状态（不返回密钥） |
 
 ## 后续迭代
 
-当前自然语言查询采用白名单字段与参数化 ORM 条件，尚未调用 LLM。下一阶段可接入受约束的实体提取器，但不应允许模型直接执行任意 SQL。其他计划包括 Alembic 正式迁移、Celery/Redis 异步批量导入、生命周期数据源、权限审计和报表导出。
+自然语言查询已接入受约束的实体提取器，并继续使用白名单字段与参数化 ORM 条件执行。后续计划包括 Alembic 正式迁移、Celery/Redis 异步批量导入、生命周期数据源、向量语义检索、权限审计和报表导出。

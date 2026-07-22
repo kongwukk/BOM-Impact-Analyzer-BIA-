@@ -22,10 +22,13 @@ services:
     environment:
       - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
       - PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
-      # 修改为 psycopg2
-      - BIA_DATABASE_URL=postgresql+psycopg2://bom_user:bom_password@postgres:5432/bom_db
+      - BIA_DATABASE_URL=postgresql+psycopg://bom_user:bom_password@postgres:5432/bom_db
       - BIA_CORS_ORIGINS=http://localhost:3000
       - BIA_UPLOAD_DIR=/app/data/uploads
+      - BIA_LLM_ENABLED=${BIA_LLM_ENABLED:-false}
+      - BIA_LLM_API_KEY=${BIA_LLM_API_KEY:-}
+      - BIA_LLM_BASE_URL=${BIA_LLM_BASE_URL:-https://api.openai.com/v1}
+      - BIA_LLM_MODEL=${BIA_LLM_MODEL:-gpt-4o-mini}
     volumes:
       - upload_data:/app/data/uploads
     ports:

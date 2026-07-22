@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Boxes, Database, FileSpreadsheet, Search, Upload } from "lucide-react";
-import { ComponentCandidate, getImpactById, getOverview, ImpactResult, OverviewData, searchComponents, uploadBom } from "./api";
+import { AlertTriangle, Bot, Boxes, Database, FileSpreadsheet, Search, Send, Sparkles, Upload } from "lucide-react";
+import { askNaturalQuestion, ComponentCandidate, getImpactById, getLlmStatus, getOverview, ImpactResult, LlmStatus, NaturalQueryResult, OverviewData, searchComponents, uploadBom } from "./api";
 
-type View = "dashboard" | "upload" | "impact";
+type View = "dashboard" | "upload" | "impact" | "assistant";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -13,12 +13,15 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [naturalResult, setNaturalResult] = useState<NaturalQueryResult | null>(null);
+  const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
 
   useEffect(() => {
     let active = true;
     getOverview()
       .then((data) => { if (active) setOverview(data); })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "总览加载失败"); });
+    getLlmStatus().then((data) => { if (active) setLlmStatus(data); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
 
@@ -77,6 +80,21 @@ export default function App() {
     }
   }
 
+  async function askAssistant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const question = String(new FormData(event.currentTarget).get("question") || "").trim();
+    if (!question) return;
+    setBusy(true);
+    setError("");
+    try {
+      setNaturalResult(await askNaturalQuestion(question));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "智能查询失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="shell">
       <aside>
@@ -85,11 +103,12 @@ export default function App() {
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><Database />总览</button>
           <button className={view === "upload" ? "active" : ""} onClick={() => setView("upload")}><Upload />BOM 导入</button>
           <button className={view === "impact" ? "active" : ""} onClick={() => setView("impact")}><Search />影响查询</button>
+          <button className={view === "assistant" ? "active" : ""} onClick={() => setView("assistant")}><Bot />智能问答</button>
         </nav>
         <div className="aside-note">MVP · v0.1.0</div>
       </aside>
       <main>
-        <header><div><small>BOM IMPACT ANALYZER</small><h1>{view === "dashboard" ? "系统总览" : view === "upload" ? "BOM 数据导入" : "元器件影响查询"}</h1></div><span className="status"><i />服务就绪</span></header>
+        <header><div><small>BOM IMPACT ANALYZER</small><h1>{view === "dashboard" ? "系统总览" : view === "upload" ? "BOM 数据导入" : view === "impact" ? "元器件影响查询" : "BOM 智能问答"}</h1></div><span className="status"><i />服务就绪</span></header>
 
         {error && <div className="error"><AlertTriangle size={18} />{error}</div>}
         {view === "dashboard" && <Dashboard navigate={setView} overview={overview} />}
@@ -112,9 +131,20 @@ export default function App() {
             {impact ? <ImpactTable impact={impact} /> : candidates.length ? <CandidateList candidates={candidates} select={selectCandidate} busy={busy} /> : <div className="empty"><Search size={42} /><h3>从一个元器件开始</h3><p>支持按编号、型号、名称或物料描述搜索。</p></div>}
           </section>
         )}
+        {view === "assistant" && <AssistantPanel submit={askAssistant} result={naturalResult} busy={busy} status={llmStatus} />}
       </main>
     </div>
   );
+}
+
+function AssistantPanel({ submit, result, busy, status }: { submit: (event: FormEvent<HTMLFormElement>) => void; result: NaturalQueryResult | null; busy: boolean; status: LlmStatus | null }) {
+  const examples = ["哪些产品使用了 TI 的电源管理芯片？", "STM32F103C8T6 影响哪些产品？", "查询所有 EOL 的关键器件"];
+  return <section className="panel assistant-panel">
+    <div className="assistant-intro"><div className="assistant-icon"><Sparkles /></div><div><h2>用自然语言查询 BOM</h2><p>大模型仅解析查询意图，结果始终来自结构化 BOM 数据库。</p></div><span className={`llm-badge ${status?.available ? "online" : "fallback"}`}>{status?.available ? `${status.model} 已配置` : "本地规则模式"}</span></div>
+    <form className="assistant-form" onSubmit={submit}><textarea name="question" required minLength={2} maxLength={500} placeholder="例如：哪些产品的 BOM 中使用了 TI 的电源管理芯片？" /><button className="primary" disabled={busy}><Send size={18} />{busy ? "正在分析…" : "发送查询"}</button></form>
+    {!result && <div className="query-examples"><span>可以这样问：</span>{examples.map((example) => <button key={example} type="button" onClick={(event) => { const input = event.currentTarget.closest("section")?.querySelector("textarea"); if (input) { input.value = example; input.focus(); } }}>{example}</button>)}</div>}
+    {result && <div className="assistant-result"><div className="answer"><Bot /><div><strong>{result.answer}</strong><small>{result.mode === "llm-structured" ? "大模型结构化解析" : "本地规则解析"}</small></div></div>{result.warning && <div className="query-warning">{result.warning}</div>}<div className="plan-chips">{result.interpreted_as.manufacturer && <span>厂商：{result.interpreted_as.manufacturer}</span>}{result.interpreted_as.part_number && <span>型号：{result.interpreted_as.part_number}</span>}{result.interpreted_as.lifecycle_status && <span>状态：{result.interpreted_as.lifecycle_status}</span>}{result.interpreted_as.keywords.map((keyword) => <span key={keyword}>关键词：{keyword}</span>)}</div>{result.results.length > 0 && <div className="table-wrap"><table><thead><tr><th>产品型号</th><th>元器件型号</th><th>制造商 / 描述</th><th>状态</th><th>数量</th></tr></thead><tbody>{result.results.map((row, index) => <tr key={`${row.product_code}-${row.part_number}-${index}`}><td><b>{row.product_code}</b><small>{row.product_name}</small></td><td>{row.part_number}</td><td>{row.manufacturer || row.description || "—"}</td><td>{row.lifecycle_status}</td><td>{row.quantity}</td></tr>)}</tbody></table></div>}</div>}
+  </section>;
 }
 
 function CandidateList({ candidates, select, busy }: { candidates: ComponentCandidate[]; select: (candidate: ComponentCandidate) => void; busy: boolean }) {
