@@ -16,15 +16,16 @@ RUN apt-get update && apt-get install -y \
 
 # 安装所有 Python 依赖
 RUN pip install --no-cache-dir \
-    fastapi>=0.115 \
-    uvicorn[standard]>=0.32 \
-    sqlalchemy>=2.0 \
-    psycopg2-binary>=2.9 \
-    pandas>=2.0 \
-    openpyxl>=3.0 \
-    numpy>=1.24 \
-    python-multipart \
-    pydantic-settings
+    "fastapi>=0.115" \
+    "uvicorn[standard]>=0.32" \
+    "sqlalchemy>=2.0" \
+    "psycopg[binary]>=3.2" \
+    "pandas>=2.0" \
+    "openpyxl>=3.0" \
+    "numpy>=1.24" \
+    "python-multipart>=0.0.17" \
+    "pydantic-settings>=2.6" \
+    "httpx>=0.27"
 
 COPY app ./app
 
